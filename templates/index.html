@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flask Task Manager</title>
+  <link rel="stylesheet" href="/flask/static/css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Task Manager</h1>
+      <p class="subtitle">A simple Flask app</p>
+    </header>
+
+    <form id="add-form">
+      <div class="input-row">
+        <input
+          type="text"
+          id="new-task"
+          placeholder="Add a new task..."
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Add</button>
+      </div>
+    </form>
+
+    <ul id="task-list"></ul>
+
+    <p id="empty-state" class="empty">No tasks yet. Add one above!</p>
+  </div>
+
+  <script>
+    const BASE = "/flask/api";
+
+    async function loadTasks() {
+      const res = await fetch(`${BASE}/tasks`);
+      const tasks = await res.json();
+      renderTasks(tasks);
+    }
+
+    function renderTasks(tasks) {
+      const list = document.getElementById("task-list");
+      const empty = document.getElementById("empty-state");
+      list.innerHTML = "";
+      if (tasks.length === 0) {
+        empty.style.display = "block";
+        return;
+      }
+      empty.style.display = "none";
+      tasks.forEach((task) => {
+        const li = document.createElement("li");
+        li.className = task.done ? "done" : "";
+        li.innerHTML = `
+          <span class="task-title">${escapeHtml(task.title)}</span>
+          <div class="actions">
+            <button class="btn-toggle" onclick="toggleTask(${task.id})">
+              ${task.done ? "Undo" : "Done"}
+            </button>
+            <button class="btn-delete" onclick="deleteTask(${task.id})">Delete</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    async function toggleTask(id) {
+      const res = await fetch(`${BASE}/tasks/${id}`, { method: "PATCH" });
+      if (res.ok) loadTasks();
+    }
+
+    async function deleteTask(id) {
+      const res = await fetch(`${BASE}/tasks/${id}`, { method: "DELETE" });
+      if (res.ok) loadTasks();
+    }
+
+    document.getElementById("add-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("new-task");
+      const title = input.value.trim();
+      if (!title) return;
+      const res = await fetch(`${BASE}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (res.ok) {
+        input.value = "";
+        loadTasks();
+      }
+    });
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>

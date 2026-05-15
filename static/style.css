@@ -1,0 +1,151 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f0f4f8;
+  color: #1a202c;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.container {
+  width: 100%;
+  max-width: 540px;
+}
+
+header {
+  margin-bottom: 32px;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.subtitle {
+  margin-top: 4px;
+  color: #718096;
+  font-size: 0.9rem;
+}
+
+#add-form {
+  margin-bottom: 24px;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #fff;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: #667eea;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 0.15s, transform 0.1s;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+form button[type="submit"] {
+  padding: 10px 20px;
+  background: #667eea;
+  color: #fff;
+}
+
+form button[type="submit"]:hover {
+  background: #5a67d8;
+}
+
+#task-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#task-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: opacity 0.2s;
+}
+
+#task-list li.done {
+  opacity: 0.55;
+}
+
+#task-list li.done .task-title {
+  text-decoration: line-through;
+  color: #a0aec0;
+}
+
+.task-title {
+  flex: 1;
+  font-size: 0.97rem;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.btn-toggle {
+  padding: 6px 14px;
+  background: #ebf4ff;
+  color: #3182ce;
+}
+
+.btn-toggle:hover {
+  background: #bee3f8;
+}
+
+.btn-delete {
+  padding: 6px 14px;
+  background: #fff5f5;
+  color: #e53e3e;
+}
+
+.btn-delete:hover {
+  background: #fed7d7;
+}
+
+.empty {
+  text-align: center;
+  color: #a0aec0;
+  margin-top: 32px;
+  font-size: 0.95rem;
+  display: none;
+}
