@@ -13,9 +13,9 @@ app = Flask(__name__)
 # Each entry: (display_name, risk_level, h_lo, h_hi, s_lo, s_hi, v_lo, v_hi, hex_color)
 COLOR_PROFILES = [
     # Orange / Yellow  →  Low creatinine (dilute urine)
-    ("Orange / Yellow",  "Low Creatinine",  8,  40, 100, 255, 100, 255, "#F4A020"),
+    ("Orange / Yellow",  "Low Creatinine",  8,  35, 100, 255, 100, 255, "#F4A020"),
     # Green            →  Moderate / Normal creatinine
-    ("Green",            "Normal",          40,  90,  60, 255,  60, 255, "#3CB371"),
+    ("Green",            "Normal",          38,  90,  60, 255,  60, 255, "#3CB371"),
     # Blue / Dark Blue →  High / Concentrated creatinine
     ("Blue / Dark Blue", "High Creatinine", 90, 130,  60, 255,  30, 255, "#1A5DAB"),
 ]
@@ -53,9 +53,9 @@ def classify_color(h, s, v):
     # Fallback: nearest hue match among the three target colors
     if s < 50:
         return {"color_name": "Unrecognized", "risk": "Unrecognized", "hex": "#AAAAAA"}
-    if h < 45 or h > 155:
+    if h < 38 or h > 155:
         return {"color_name": "Orange / Yellow", "risk": "Low Creatinine", "hex": "#F4A020"}
-    if 45 <= h < 90:
+    if 38 <= h < 90:
         return {"color_name": "Green", "risk": "Normal", "hex": "#3CB371"}
     return {"color_name": "Blue / Dark Blue", "risk": "High Creatinine", "hex": "#1A5DAB"}
 
