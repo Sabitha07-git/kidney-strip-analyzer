@@ -13,9 +13,9 @@ app = Flask(__name__)
 # Each entry: (display_name, risk_level, h_lo, h_hi, s_lo, s_hi, v_lo, v_hi, hex_color)
 COLOR_PROFILES = [
     # Orange / Yellow  →  Low creatinine (dilute urine)
-    ("Orange / Yellow",  "Low Creatinine",  8,  35, 100, 255, 100, 255, "#F4A020"),
+    ("Orange / Yellow",  "Low Creatinine",  8,  40, 100, 255, 100, 255, "#F4A020"),
     # Green            →  Moderate / Normal creatinine
-    ("Green",            "Normal",          38,  90,  60, 255,  60, 255, "#3CB371"),
+    ("Green",            "Normal",          40,  90,  60, 255,  60, 255, "#3CB371"),
     # Blue / Dark Blue →  High / Concentrated creatinine
     ("Blue / Dark Blue", "High Creatinine", 90, 130,  60, 255,  30, 255, "#1A5DAB"),
 ]
@@ -34,24 +34,38 @@ RECOMMENDATIONS = {
     "Unrecognized":    "Unable to classify the strip color. Retake the photo in good lighting against a plain white background and ensure the strip is fully visible.",
 }
 
-def white_balance(bgr):
-    result = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
-    avg_a = np.mean(result[:, :, 1])
-    avg_b = np.mean(result[:, :, 2])
-    result[:, :, 1] -= (avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1
-    result[:, :, 2] -= (avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1
-    result = np.clip(result, 0, 255).astype(np.uint8)
-    return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
-
 def extract_dominant_hsv(bgr):
+    """
+    Detect the dipstick region by isolating saturated (coloured) pixels,
+    then return the dominant HSV cluster.  Returns None when the image
+    contains insufficient coloured content (no strip detected).
+    """
     h, w = bgr.shape[:2]
-    cy, cx = h//2, w//2
-    my, mx = h//4, w//4
-    roi = bgr[cy-my:cy+my, cx-mx:cx+mx]
+    # Use centre 60 % of the image to reduce border / hand interference
+    cy, cx = h // 2, w // 2
+    my, mx = int(h * 0.30), int(w * 0.30)
+    roi = bgr[cy - my:cy + my, cx - mx:cx + mx]
+
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    pixels = hsv.reshape(-1,3).astype(np.float32)
-    criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
-    _, labels, centers = cv2.kmeans(pixels, 3, None, criteria, 5, cv2.KMEANS_RANDOM_CENTERS)
+
+    # ── Mask: keep only pixels that look like strip colours ──────────────
+    # Exclude near-white background  (low S), blown-out whites (V≥245),
+    # and very dark shadows (V≤25).
+    sat   = hsv[:, :, 1]
+    val   = hsv[:, :, 2]
+    mask  = (sat >= 45) & (val >= 30) & (val <= 245)
+
+    colored = hsv[mask].astype(np.float32)
+
+    # Need at least 1 % of ROI pixels to be coloured – otherwise no strip
+    min_px = max(60, int(roi.shape[0] * roi.shape[1] * 0.01))
+    if len(colored) < min_px:
+        return None          # signal: strip not detected
+
+    k = min(3, len(colored))
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+    _, labels, centers = cv2.kmeans(
+        colored, k, None, criteria, 5, cv2.KMEANS_PP_CENTERS)
     counts = np.bincount(labels.flatten())
     return tuple(centers[counts.argmax()].astype(int))
 
@@ -62,9 +76,9 @@ def classify_color(h, s, v):
     # Fallback: nearest hue match among the three target colors
     if s < 50:
         return {"color_name": "Unrecognized", "risk": "Unrecognized", "hex": "#AAAAAA"}
-    if h < 38 or h > 155:
+    if h < 45 or h > 155:
         return {"color_name": "Orange / Yellow", "risk": "Low Creatinine", "hex": "#F4A020"}
-    if 38 <= h < 90:
+    if 45 <= h < 90:
         return {"color_name": "Green", "risk": "Normal", "hex": "#3CB371"}
     return {"color_name": "Blue / Dark Blue", "risk": "High Creatinine", "hex": "#1A5DAB"}
 
@@ -952,6 +966,53 @@ header {
   color: #7dd3fc; transform: translateY(-2px);
 }
 
+/* Insights tab buttons */
+.insights-btn {
+  display: inline-flex; align-items: center; gap: .55rem;
+  padding: .75rem 1.6rem;
+  background: linear-gradient(135deg, #1a3a8f 0%, #2255c4 100%);
+  color: #e8efff; font-family: 'Space Grotesk', sans-serif;
+  font-size: .88rem; font-weight: 600; letter-spacing: .03em;
+  border-radius: 8px; text-decoration: none;
+  border: 1px solid rgba(100,150,255,.25);
+  box-shadow: 0 4px 18px rgba(26,58,143,.35);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.insights-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(26,58,143,.5);
+  background: linear-gradient(135deg, #1e44ab 0%, #2b66e8 100%);
+}
+.insights-btn-alt {
+  background: linear-gradient(135deg, #0f4c75 0%, #1877b8 100%);
+  box-shadow: 0 4px 18px rgba(15,76,117,.4);
+}
+.insights-btn-alt:hover {
+  background: linear-gradient(135deg, #125a8a 0%, #1e8cd8 100%);
+  box-shadow: 0 8px 28px rgba(15,76,117,.55);
+}
+.insights-card {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(68,114,214,.18);
+  border-radius: 12px;
+  padding: 2rem 2rem 1.75rem;
+  max-width: 760px;
+}
+.insights-card-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .72rem; font-weight: 500; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--g-300); margin-bottom: .6rem;
+}
+.insights-card-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.2rem; font-weight: 700; color: #e8efff;
+  margin-bottom: .85rem;
+}
+.insights-card-body {
+  font-size: .88rem; color: var(--ink2); line-height: 1.7;
+  margin-bottom: 1.4rem;
+}
+
 /* Sections */
 .lm-section {
   padding: 3.5rem 2.5rem;
@@ -1558,6 +1619,10 @@ header {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           Future
         </a>
+        <a href="#lm-insights" class="lm-jump-btn" onclick="scrollToLmSection('lm-insights',event)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Insights
+        </a>
       </div>
     </div>
   </div>
@@ -1591,6 +1656,43 @@ header {
         <div class="future-body">
           Our future goal is to develop an intelligent model that continuously tracks user data over a period of time, monitors health and lifestyle patterns, and provides personalized diet recommendations along with hydration planning to improve overall wellness.
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Insights ────────────────────────────────────────────────────── -->
+  <section id="lm-insights" class="lm-section">
+    <div class="lm-section-inner">
+      <div class="lm-section-eyebrow">Documentation &amp; Research</div>
+      <h2 class="lm-section-title">Insights</h2>
+      <p class="lm-section-sub" style="margin-bottom:2.5rem;">Explore the full academic research, technical thesis, and system workflow documentation behind NephroScan.</p>
+
+      <!-- Thesis / Report card -->
+      <div class="insights-card">
+        <div class="insights-card-eyebrow">Academic Work</div>
+        <h3 class="insights-card-title">Thesis / Report</h3>
+        <p class="insights-card-body">
+          From initial problem scoping and biomarker research to iterative hardware evaluation and full-stack web deployment, our project journey is captured in this comprehensive technical thesis. It documents every design decision, research finding, and development milestone — along with the complete architecture of the NephroScan platform and its clinical rationale.
+        </p>
+        <a href="https://docs.google.com/document/d/1IZGsjANnYJvwx3bX8Zwo38AxzUTsrmn2/edit?usp=sharing&ouid=100245952038616943949&rtpof=true&sd=true"
+           target="_blank" rel="noopener" class="insights-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          View Thesis / Report
+        </a>
+      </div>
+
+      <!-- Flowchart card -->
+      <div class="insights-card" style="margin-top:1.5rem;">
+        <div class="insights-card-eyebrow" style="color:#7dd3fc;">Workflow Diagrams</div>
+        <h3 class="insights-card-title">Flowchart</h3>
+        <p class="insights-card-body">
+          These flowcharts illustrate the complete NephroScan system — from the high-level project journey and website navigation structure, through the backend image analysis pipeline, hardware evaluation decision tree, HSV color classification logic, and a step-by-step user tutorial workflow. Together they provide a clear visual map of how the system was designed, built, and operates end-to-end.
+        </p>
+        <a href="https://docs.google.com/document/d/1pWQoiswio5RDxMOjn3VH5v8KKhxEJeDZTWp58vFKEpk/edit?usp=sharing"
+           target="_blank" rel="noopener" class="insights-btn insights-btn-alt">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          View Flowchart
+        </a>
       </div>
     </div>
   </section>
@@ -1831,6 +1933,7 @@ async function analyzeImage() {
     const data = await res.json();
     if (data.error) { alert('Error: ' + data.error); return; }
     window._result = data;
+    if (data.strip_detected === false) { showStripWarning(); return; }
     renderResults(data);
     prg.style.width = '100%';
     setTimeout(() => prg.style.width = '0', 600);
@@ -2010,6 +2113,27 @@ function downloadReport() {
   <div class="overlay-label">Analyzing<span class="overlay-dots"></span></div>
 </div>
 
+<!-- ── Strip-not-detected warning popup ──────────────────────────── -->
+<div id="strip-warning-backdrop" onclick="closeStripWarning()" style="display:none;position:fixed;inset:0;background:rgba(6,14,32,.55);backdrop-filter:blur(3px);z-index:9000;align-items:center;justify-content:center;"></div>
+<div id="strip-warning-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9001;background:#fff;border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.28);padding:36px 32px 28px;max-width:420px;width:90%;text-align:center;">
+  <div style="font-size:2.4rem;margin-bottom:12px;">&#9888;&#65039;</div>
+  <h3 style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:700;color:#0d0d1a;margin-bottom:12px;">Unrecognized Strip Detected</h3>
+  <p style="font-size:.9rem;color:#4a5570;line-height:1.65;margin-bottom:24px;">Unrecognized strip detected. Please upload a clearer image with proper lighting and zoom in on the test strip.</p>
+  <button onclick="closeStripWarning()" style="background:#1a3a8f;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:.9rem;font-family:'Space Grotesk',sans-serif;font-weight:600;cursor:pointer;letter-spacing:.02em;">Try Again</button>
+</div>
+
+<script>
+function showStripWarning() {
+  document.getElementById('strip-warning-backdrop').style.display = 'flex';
+  document.getElementById('strip-warning-modal').style.display   = 'block';
+}
+function closeStripWarning() {
+  document.getElementById('strip-warning-backdrop').style.display = 'none';
+  document.getElementById('strip-warning-modal').style.display   = 'none';
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeStripWarning(); });
+</script>
+
 </body>
 </html>
 """
@@ -2031,7 +2155,21 @@ def analyze():
     if bgr is None:
         return jsonify({"error": "Could not decode image"}), 400
     try:
-        h, s, v = extract_dominant_hsv(white_balance(bgr))
+        result = extract_dominant_hsv(bgr)
+        if result is None:
+            # Not enough coloured pixels — strip not detected
+            return jsonify({
+                "hsv":              {"h": 0, "s": 0, "v": 0},
+                "rgb":              {"r": 180, "g": 180, "b": 180},
+                "hex":              "#AAAAAA",
+                "color_name":       "Unrecognized",
+                "risk":             "Unrecognized",
+                "risk_description": RISK_META["Unrecognized"]["description"],
+                "recommendation":   RECOMMENDATIONS["Unrecognized"],
+                "annotated_image":  image_to_b64(bgr),
+                "strip_detected":   False,
+            })
+        h, s, v = result
         cls     = classify_color(h, s, v)
         ann     = annotate_image(bgr, h, s, v)
         r, g, b = hsv_to_rgb(h, s, v)
@@ -2045,6 +2183,7 @@ def analyze():
             "risk_description": RISK_META[risk]["description"],
             "recommendation":   RECOMMENDATIONS[risk],
             "annotated_image":  image_to_b64(ann),
+            "strip_detected":   risk != "Unrecognized",
         })
     except Exception:
         return jsonify({"error": traceback.format_exc()}), 500
