@@ -34,6 +34,15 @@ RECOMMENDATIONS = {
     "Unrecognized":    "Unable to classify the strip color. Retake the photo in good lighting against a plain white background and ensure the strip is fully visible.",
 }
 
+def white_balance(bgr):
+    result = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+    avg_a = np.mean(result[:, :, 1])
+    avg_b = np.mean(result[:, :, 2])
+    result[:, :, 1] -= (avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1
+    result[:, :, 2] -= (avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1
+    result = np.clip(result, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+
 def extract_dominant_hsv(bgr):
     h, w = bgr.shape[:2]
     cy, cx = h//2, w//2
@@ -2022,7 +2031,7 @@ def analyze():
     if bgr is None:
         return jsonify({"error": "Could not decode image"}), 400
     try:
-        h, s, v = extract_dominant_hsv(bgr)
+        h, s, v = extract_dominant_hsv(white_balance(bgr))
         cls     = classify_color(h, s, v)
         ann     = annotate_image(bgr, h, s, v)
         r, g, b = hsv_to_rgb(h, s, v)
